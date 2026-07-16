@@ -17,12 +17,12 @@ import {
 // 🔥 Firebase 초기화
 // ------------------------------
 const firebaseConfig = {
-    apiKey: import.meta.env.VITE_FIREBASE_WEB_API_KEY,
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: import.meta.env.VITE_FIREBASE_SENDER_ID,
-    appId: import.meta.env.VITE_FIREBASE_APP_ID
+  apiKey: "AIzaSyDZAb5Uh2GIFOIzk7FHR5dg1YDLCSceAHI",
+  authDomain: "steamfox-1a5ee.firebaseapp.com",
+  projectId: "steamfox-1a5ee",
+  storageBucket: "steamfox-1a5ee.firebasestorage.app",
+  messagingSenderId: "59475393629",
+  appId: "1:59475393629:web:df0ade8e2b64e83d7321b4"
 };
 
 // Firebase 앱 초기화
