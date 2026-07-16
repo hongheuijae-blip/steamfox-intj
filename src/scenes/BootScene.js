@@ -96,3 +96,36 @@ export default class BootScene extends Phaser.Scene {
         });
     }
 }
+
+// src/scenes/BootScene.js
+
+import Phaser from "phaser";
+import { AudioManager } from "../systems/AudioManager.js";
+
+export default class BootScene extends Phaser.Scene {
+  constructor() {
+    super("BootScene");
+  }
+
+  preload() {
+    // 🔹 이미지/타일/스프라이트 등 기존 리소스 로드가 있다면 여기 유지
+
+    // 🔹 BGM 오디오 로드 (public/audio 기준)
+    this.load.audio("bgm_overworld", "audio/overworld_bgm.mp3");
+    this.load.audio("bgm_dungeon", "audio/dungeon_bgm.mp3");
+    this.load.audio("bgm_boss", "audio/boss_bgm.mp3");
+    this.load.audio("bgm_village", "audio/village_bgm.mp3");
+    this.load.audio("bgm_story", "audio/story_bgm.mp3");
+  }
+
+  create() {
+    // 🔹 전역 오디오 매니저 생성
+    this.game.audioManager = new AudioManager(this);
+
+    // 🔹 기본 BGM 재생 (예: 필드)
+    this.game.audioManager.playBGM("bgm_overworld");
+
+    // 🔹 다음 씬으로 넘어가는 로직이 있다면 그대로 유지
+    // this.scene.start("MainScene");
+  }
+}
