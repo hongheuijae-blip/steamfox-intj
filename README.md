@@ -40,3 +40,28 @@ INTJ‑A 성향의 탐구자 여우 캐릭터를 중심으로
 
 ## 📁 프로젝트 구조
 
+
+# Steampunk Latin Psalm ARPG
+
+자동 생성된 맵, 몬스터, NPC, 퀘스트, 던전, 보스, 스킬, 장비를 사용하는  
+Phaser 기반 2D ARPG 프로젝트입니다.  
+BGM은 Suno에서 수동으로 생성한 mp3 파일을 사용하며,  
+`public/audio` 폴더에 추가하면 바로 게임에 적용되도록 구성되어 있습니다.
+
+---
+
+## 1. 폴더 구조
+
+```bash
+src/
+  scenes/
+    BootScene.js
+    OverworldScene.js
+    DungeonScene.js
+public/
+  audio/
+    overworld_bgm.mp3
+    dungeon_bgm.mp3
+    boss_bgm.mp3
+    village_bgm.mp3
+    story_bgm.mp3
