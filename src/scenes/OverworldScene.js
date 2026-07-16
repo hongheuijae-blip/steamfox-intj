@@ -13,7 +13,11 @@ export default class OverworldScene extends Phaser.Scene {
         this.dungeonMap = data.dungeonMap;
         this.dungeonMonsters = data.dungeonMonsters || [];
         this.dungeonBoss = data.dungeonBoss || null;
+
+        // 캐릭터 생성 씬에서 넘어온 데이터
         this.playerData = data.playerData || {};
+        this.characterType = this.playerData.characterType || "Fox";
+        this.mbti = this.playerData.mbti || "INTJ";
     }
 
     create() {
@@ -75,21 +79,61 @@ export default class OverworldScene extends Phaser.Scene {
             monster.name = m.name || `Monster_${index}`;
         });
 
-        // 플레이어
+        // 플레이어 생성 (지금은 Fox 스프라이트만 사용, 캐릭터 타입은 데이터로만 반영)
         this.player = this.physics.add.sprite(400, 300, "fox_idle");
         this.player.setScale(1.5);
         this.player.setCollideWorldBounds(true);
-        this.player.hp = this.playerData.hp ?? 100;
-        this.player.maxHp = 100;
-        this.player.mp = this.playerData.mp ?? 50;
-        this.player.maxMp = 50;
-        this.player.attackPower = this.playerData.attackPower ?? 20;
+
+        // MBTI/캐릭터 타입 기반으로 기본 스탯 약간 조정 가능 (예시)
+        const baseHp = 100;
+        const baseMp = 50;
+        const baseAtk = 20;
+
+        let hpBonus = 0;
+        let mpBonus = 0;
+        let atkBonus = 0;
+
+        switch (this.characterType) {
+            case "Bear":
+                hpBonus = 30;
+                break;
+            case "Lion":
+            case "Tiger":
+                atkBonus = 10;
+                break;
+            case "Cat":
+            case "Deer":
+                mpBonus = 10;
+                break;
+            case "Wolf":
+                atkBonus = 5;
+                hpBonus = 10;
+                break;
+            case "Eagle":
+                atkBonus = 8;
+                mpBonus = 5;
+                break;
+            default:
+                break;
+        }
+
+        this.player.hp = this.playerData.hp ?? (baseHp + hpBonus);
+        this.player.maxHp = baseHp + hpBonus;
+        this.player.mp = this.playerData.mp ?? (baseMp + mpBonus);
+        this.player.maxMp = baseMp + mpBonus;
+        this.player.attackPower = this.playerData.attackPower ?? (baseAtk + atkBonus);
         this.player.isInvulnerable = false;
         this.player.equipment = this.playerData.equipment || [];
         this.player.inventory = this.playerData.inventory || [];
 
         this.createAnimations();
         this.player.play("fox_idle");
+
+        // 화면에 캐릭터 타입/MBTI 표시
+        this.add.text(20, 8, `Character: ${this.characterType} (${this.mbti})`, {
+            fontSize: "14px",
+            color: "#ffffff"
+        });
 
         // NPC
         this.npcGroup = this.physics.add.group();
@@ -145,13 +189,11 @@ export default class OverworldScene extends Phaser.Scene {
             wordWrap: { width: 320 }
         });
 
-        // 스킬 쿨타임 표시
         this.skillText = this.add.text(20, 320, "Skills:\nDash\nDodge\nSpecial", {
             fontSize: "14px",
             color: "#cccccc"
         });
 
-        // 미니맵 (간단한 점 표시)
         this.minimap = this.add.rectangle(700, 500, 180, 80, 0x000000, 0.5);
         this.minimapBorder = this.add.rectangle(700, 500, 180, 80, 0xffffff).setStrokeStyle(1, 0xffffff);
 
@@ -546,8 +588,7 @@ export default class OverworldScene extends Phaser.Scene {
     }
 
     updateMinimap() {
-        // 간단히 플레이어 위치만 표시 (실제 맵 좌표 스케일링은 나중에 확장 가능)
-        // 여기서는 UI 구조만 유지
+        // 지금은 구조만 유지 (나중에 실제 좌표 스케일링 추가 가능)
     }
 
     async saveGame() {
@@ -556,7 +597,9 @@ export default class OverworldScene extends Phaser.Scene {
             mp: this.player.mp,
             attackPower: this.player.attackPower,
             inventory: this.player.inventory,
-            equipment: this.player.equipment
+            equipment: this.player.equipment,
+            characterType: this.characterType,
+            mbti: this.mbti
         });
 
         this.dialogText.setText("게임이 저장되었습니다.");
@@ -573,7 +616,9 @@ export default class OverworldScene extends Phaser.Scene {
                 mp: this.player.mp,
                 attackPower: this.player.attackPower,
                 inventory: this.player.inventory,
-                equipment: this.player.equipment
+                equipment: this.player.equipment,
+                characterType: this.characterType,
+                mbti: this.mbti
             }
         });
     }

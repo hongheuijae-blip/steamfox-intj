@@ -18,7 +18,7 @@ export default class BootScene extends Phaser.Scene {
             color: "#ffffff"
         }).setOrigin(0.5);
 
-        // 기본 플레이어 스프라이트
+        // 기본 플레이어 스프라이트 (지금은 Fox 기준)
         this.load.image("fox_idle", "https://dummyimage.com/64x64/ffffff/000000&text=Fox");
         this.load.spritesheet("fox_walk", "https://dummyimage.com/192x64/ffffff/000000&text=Walk", {
             frameWidth: 64,
@@ -79,7 +79,9 @@ export default class BootScene extends Phaser.Scene {
     }
 
     create() {
-        this.scene.start("OverworldScene", {
+        // 기존에는 OverworldScene으로 바로 갔지만,
+        // 이제는 캐릭터 MBTI 검사 씬부터 시작
+        this.scene.start("CharacterTestScene", {
             overworldMap: this.overworldMap,
             overworldMonsters: this.overworldMonsters,
             overworldNPCs: this.overworldNPCs,
