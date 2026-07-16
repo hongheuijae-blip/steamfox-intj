@@ -11,11 +11,9 @@ export default class DungeonScene extends Phaser.Scene {
     }
 
     create() {
-        // BGM
-        this.bgm = this.sound.add("bgm_dungeon", { loop: true, volume: 0.5 });
+        this.bgm = this.sound.add("bgm_dungeon", { loop: true, volume: 0.6 });
         this.bgm.play();
 
-        // 맵
         this.cameras.main.setBackgroundColor("#1b1b1b");
 
         if (this.mapData) {
@@ -49,7 +47,6 @@ export default class DungeonScene extends Phaser.Scene {
             });
         }
 
-        // 플레이어
         this.player = this.physics.add.sprite(400, 300, "fox_idle");
         this.player.setScale(1.5);
         this.player.setCollideWorldBounds(true);
@@ -62,11 +59,9 @@ export default class DungeonScene extends Phaser.Scene {
         this.createAnimations();
         this.player.play("fox_idle");
 
-        // 몬스터 웨이브
         this.monsterGroup = this.physics.add.group();
         this.spawnWave(1);
 
-        // 보스
         if (this.bossData) {
             this.boss = this.physics.add.sprite(
                 this.bossData.x ?? 700,
@@ -81,7 +76,6 @@ export default class DungeonScene extends Phaser.Scene {
             this.boss.phase = 1;
         }
 
-        // HUD
         this.hpBarBg = this.add.rectangle(20, 50, 200, 16, 0x333333).setOrigin(0, 0);
         this.hpBar = this.add.rectangle(20, 50, 200, 16, 0xff4444).setOrigin(0, 0);
 
@@ -104,7 +98,6 @@ export default class DungeonScene extends Phaser.Scene {
         this.updateInventoryUI();
         this.updateBossUI();
 
-        // 입력
         this.cursors = this.input.keyboard.createCursorKeys();
         this.attackKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
         this.shootKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F);
@@ -477,12 +470,14 @@ export default class DungeonScene extends Phaser.Scene {
             }
         }
 
-        // 간단한 페이즈 예시
         if (this.boss.hp < (this.bossData.hp ?? 300) * 0.5 && this.boss.phase === 1) {
             this.boss.phase = 2;
             this.boss.attack += 10;
             this.bossText.setText("Boss: Phase 2!");
-            this.sound.play("bgm_boss", { volume: 0.7 });
+
+            if (this.bgm) this.bgm.stop();
+            this.bossBgm = this.sound.add("bgm_boss", { loop: true, volume: 0.8 });
+            this.bossBgm.play();
         }
     }
 

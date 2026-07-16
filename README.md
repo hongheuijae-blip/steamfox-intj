@@ -54,6 +54,7 @@ BGM은 Suno에서 수동으로 생성한 mp3 파일을 사용하며,
 
 ```bash
 src/
+  firebaseClient.js
   scenes/
     BootScene.js
     OverworldScene.js

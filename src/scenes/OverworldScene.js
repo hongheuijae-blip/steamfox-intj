@@ -17,11 +17,9 @@ export default class OverworldScene extends Phaser.Scene {
     }
 
     create() {
-        // BGM
-        this.bgm = this.sound.add("bgm_overworld", { loop: true, volume: 0.5 });
+        this.bgm = this.sound.add("bgm_overworld", { loop: true, volume: 0.6 });
         this.bgm.play();
 
-        // 맵
         this.cameras.main.setBackgroundColor("#2b2b2b");
 
         if (this.overworldMap) {
@@ -55,7 +53,6 @@ export default class OverworldScene extends Phaser.Scene {
             });
         }
 
-        // 몬스터
         this.monsterGroup = this.physics.add.group();
         this.overworldMonsters.forEach((m, index) => {
             const x = m.spawnX ?? (600 + index * 80);
@@ -75,7 +72,6 @@ export default class OverworldScene extends Phaser.Scene {
             monster.name = m.name || `Monster_${index}`;
         });
 
-        // 플레이어
         this.player = this.physics.add.sprite(400, 300, "fox_idle");
         this.player.setScale(1.5);
         this.player.setCollideWorldBounds(true);
@@ -85,11 +81,9 @@ export default class OverworldScene extends Phaser.Scene {
         this.player.equipment = this.playerData.equipment || [];
         this.player.inventory = this.playerData.inventory || [];
 
-        // 애니메이션
         this.createAnimations();
         this.player.play("fox_idle");
 
-        // NPC
         this.npcGroup = this.physics.add.group();
         this.overworldNPCs.forEach((npcData, index) => {
             const npc = this.npcGroup.create(
@@ -110,11 +104,9 @@ export default class OverworldScene extends Phaser.Scene {
             );
         });
 
-        // 포탈
         this.portal = this.physics.add.sprite(800, 300, "portal");
         this.portal.setImmovable(true);
 
-        // UI / HUD
         this.hpBarBg = this.add.rectangle(20, 20, 200, 16, 0x333333).setOrigin(0, 0);
         this.hpBar = this.add.rectangle(20, 20, 200, 16, 0xff4444).setOrigin(0, 0);
 
@@ -147,7 +139,6 @@ export default class OverworldScene extends Phaser.Scene {
         this.updateEquipmentUI();
         this.updateQuestUI();
 
-        // 입력
         this.cursors = this.input.keyboard.createCursorKeys();
         this.attackKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
         this.shootKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F);
@@ -166,7 +157,6 @@ export default class OverworldScene extends Phaser.Scene {
 
         this.projectiles = this.physics.add.group();
 
-        // 충돌
         if (this.collisionLayer) {
             this.physics.add.collider(this.player, this.collisionLayer);
             this.physics.add.collider(this.monsterGroup, this.collisionLayer);
@@ -537,7 +527,7 @@ export default class OverworldScene extends Phaser.Scene {
     }
 
     enterDungeon() {
-        this.bgm.stop();
+        if (this.bgm) this.bgm.stop();
         this.scene.start("DungeonScene", {
             mapData: this.dungeonMap,
             monsters: this.dungeonMonsters,

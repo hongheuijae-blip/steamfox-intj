@@ -18,7 +18,6 @@ export default class BootScene extends Phaser.Scene {
             color: "#ffffff"
         }).setOrigin(0.5);
 
-        // 기본 리소스
         this.load.image("fox_idle", "https://dummyimage.com/64x64/ffffff/000000&text=Fox");
         this.load.spritesheet("fox_walk", "https://dummyimage.com/192x64/ffffff/000000&text=Walk", {
             frameWidth: 64,
@@ -43,15 +42,12 @@ export default class BootScene extends Phaser.Scene {
         this.load.image("npc", "https://dummyimage.com/32x48/ff9999/000000&text=NPC");
         this.load.image("boss", "https://dummyimage.com/96x96/ff00ff/000000&text=BOSS");
 
-        // BGM / SFX
-        this.load.audio("bgm_overworld", "https://example.com/bgm_overworld.mp3");
-        this.load.audio("bgm_dungeon", "https://example.com/bgm_dungeon.mp3");
-        this.load.audio("bgm_boss", "https://example.com/bgm_boss.mp3");
-        this.load.audio("sfx_attack", "https://example.com/sfx_attack.mp3");
-        this.load.audio("sfx_hit", "https://example.com/sfx_hit.mp3");
-        this.load.audio("sfx_item", "https://example.com/sfx_item.mp3");
+        this.load.audio("bgm_overworld", "audio/overworld_bgm.mp3");
+        this.load.audio("bgm_dungeon", "audio/dungeon_bgm.mp3");
+        this.load.audio("bgm_boss", "audio/boss_bgm.mp3");
+        this.load.audio("bgm_village", "audio/village_bgm.mp3");
+        this.load.audio("bgm_story", "audio/story_bgm.mp3");
 
-        // 맵
         this.overworldMap = await loadMap("overworld_latest");
         if (this.overworldMap?.tilesetUrl) {
             this.load.image("tileset_overworld", this.overworldMap.tilesetUrl);
@@ -62,7 +58,6 @@ export default class BootScene extends Phaser.Scene {
             this.load.image("tileset_dungeon", this.dungeonMap.tilesetUrl);
         }
 
-        // 몬스터
         this.overworldMonsters = await loadMonstersByArea("overworld");
         this.overworldMonsters.forEach((m, index) => {
             this.load.image(`overworld_monster_${index}`, m.imageUrl);
@@ -73,7 +68,6 @@ export default class BootScene extends Phaser.Scene {
             this.load.image(`dungeon_monster_${index}`, m.imageUrl);
         });
 
-        // NPC / 퀘스트 / 플레이어 / 보스
         this.overworldNPCs = await loadNPCs("overworld");
         this.overworldQuests = await loadQuests("overworld");
         this.playerData = await loadPlayerData("player_001");
