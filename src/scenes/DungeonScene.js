@@ -1,22 +1,18 @@
-export default class OverworldScene extends Phaser.Scene {
+export default class DungeonScene extends Phaser.Scene {
     constructor() {
-        super("OverworldScene");
+        super("DungeonScene");
     }
 
     init(data) {
-        this.overworldMap = data.overworldMap;
-        this.overworldMonsters = data.overworldMonsters || [];
-        this.overworldNPCs = data.overworldNPCs || [];
-        this.dungeonMap = data.dungeonMap;
-        this.dungeonMonsters = data.dungeonMonsters || [];
+        this.mapData = data.mapData;
+        this.monsters = data.monsters || [];
     }
 
     create() {
-        this.cameras.main.setBackgroundColor("#2b2b2b");
+        this.cameras.main.setBackgroundColor("#1b1b1b");
 
-        // 맵 렌더링
-        if (this.overworldMap) {
-            const { tileSize, layers, collision } = this.overworldMap;
+        if (this.mapData) {
+            const { tileSize, layers, collision } = this.mapData;
 
             const map = this.make.tilemap({
                 data: layers,
@@ -24,7 +20,7 @@ export default class OverworldScene extends Phaser.Scene {
                 tileHeight: tileSize
             });
 
-            const tileset = map.addTilesetImage("tileset_overworld");
+            const tileset = map.addTilesetImage("tileset_dungeon");
             this.groundLayer = map.createLayer(0, tileset, 0, 0);
 
             if (collision) {
@@ -40,13 +36,12 @@ export default class OverworldScene extends Phaser.Scene {
             }
         }
 
-        // 몬스터 그룹
         this.monsterGroup = this.physics.add.group();
-        this.overworldMonsters.forEach((m, index) => {
+        this.monsters.forEach((m, index) => {
             const monster = this.monsterGroup.create(
                 600 + index * 80,
                 300,
-                `overworld_monster_${index}`
+                `dungeon_monster_${index}`
             );
             monster.setScale(2);
             monster.setCollideWorldBounds(true);
@@ -56,38 +51,12 @@ export default class OverworldScene extends Phaser.Scene {
             monster.dropItem = m.dropItem;
         });
 
-        // 플레이어
         this.player = this.physics.add.sprite(400, 300, "fox_idle");
         this.player.setScale(1.5);
         this.player.setCollideWorldBounds(true);
         this.player.hp = 100;
         this.player.isInvulnerable = false;
 
-        // NPC 그룹
-        this.npcGroup = this.physics.add.group();
-        this.overworldNPCs.forEach((npcData, index) => {
-            const npc = this.npcGroup.create(
-                200 + index * 80,
-                250,
-                "npc"
-            );
-            npc.setImmovable(true);
-            npc.dialog = npcData.dialog;
-            npc.name = npcData.name;
-
-            this.add.text(
-                npc.x - 20,
-                npc.y - 40,
-                npcData.name,
-                { fontSize: "14px", color: "#ffffaa" }
-            );
-        });
-
-        // 포탈
-        this.portal = this.physics.add.sprite(800, 300, "portal");
-        this.portal.setImmovable(true);
-
-        // UI
         this.inventory = [];
         this.inventoryText = this.add.text(20, 80, "Inventory:", {
             fontSize: "18px",
@@ -99,20 +68,12 @@ export default class OverworldScene extends Phaser.Scene {
             color: "#ffffff"
         });
 
-        this.dialogText = this.add.text(20, 140, "", {
-            fontSize: "16px",
-            color: "#ffffff",
-            wordWrap: { width: 400 }
-        });
-
-        // 입력
         this.cursors = this.input.keyboard.createCursorKeys();
         this.attackKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
         this.shootKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F);
         this.dashKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
         this.dodgeKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ALT);
         this.specialKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
-        this.interactKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
 
         this.moveSpeed = 200;
         this.lastMeleeAttack = 0;
@@ -123,21 +84,10 @@ export default class OverworldScene extends Phaser.Scene {
 
         this.projectiles = this.physics.add.group();
 
-        // 충돌
         if (this.collisionLayer) {
             this.physics.add.collider(this.player, this.collisionLayer);
             this.physics.add.collider(this.monsterGroup, this.collisionLayer);
         }
-        this.physics.add.collider(this.player, this.npcGroup);
-        this.physics.add.overlap(this.player, this.portal, () => {
-            this.enterDungeon();
-        });
-
-        this.physics.add.overlap(this.player, this.npcGroup, (player, npc) => {
-            if (this.interactKey.isDown) {
-                this.dialogText.setText(`${npc.name}: ${npc.dialog}`);
-            }
-        });
 
         this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
     }
@@ -161,32 +111,26 @@ export default class OverworldScene extends Phaser.Scene {
     }
 
     handleSkills(time) {
-        // 대시 (SHIFT)
         if (this.dashKey.isDown && time > this.lastDashTime + 1000) {
             this.lastDashTime = time;
             const dashSpeed = 500;
-
             const vx = this.player.body.velocity.x;
             const vy = this.player.body.velocity.y;
-
             if (vx !== 0 || vy !== 0) {
                 this.player.setVelocity(vx * (dashSpeed / this.moveSpeed), vy * (dashSpeed / this.moveSpeed));
             }
         }
 
-        // 회피 (ALT) → 잠시 무적
         if (this.dodgeKey.isDown && time > this.lastDodgeTime + 1500) {
             this.lastDodgeTime = time;
             this.player.isInvulnerable = true;
             this.player.setAlpha(0.5);
-
             this.time.delayedCall(500, () => {
                 this.player.isInvulnerable = false;
                 this.player.setAlpha(1);
             });
         }
 
-        // 특수 공격 (Q) → 주변 몬스터 AoE
         if (this.specialKey.isDown && time > this.lastSpecialTime + 3000) {
             this.lastSpecialTime = time;
 
@@ -211,7 +155,6 @@ export default class OverworldScene extends Phaser.Scene {
     }
 
     handlePlayerAttack(time) {
-        // 근접 공격
         if (this.attackKey.isDown && time > this.lastMeleeAttack + 500) {
             this.lastMeleeAttack = time;
 
@@ -232,7 +175,6 @@ export default class OverworldScene extends Phaser.Scene {
             });
         }
 
-        // 원거리 공격
         if (this.shootKey.isDown && time > this.lastShootAttack + 800) {
             this.lastShootAttack = time;
 
@@ -351,12 +293,5 @@ export default class OverworldScene extends Phaser.Scene {
         );
 
         item.destroy();
-    }
-
-    enterDungeon() {
-        this.scene.start("DungeonScene", {
-            mapData: this.dungeonMap,
-            monsters: this.dungeonMonsters
-        });
     }
 }
