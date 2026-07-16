@@ -21,7 +21,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 
-// 단일 맵 로딩 (overworld, dungeon 등)
+// 맵 로딩 (오버월드/던전)
 export async function loadMap(mapId) {
     const ref = doc(db, "maps", mapId);
     const snapshot = await getDoc(ref);
@@ -29,16 +29,7 @@ export async function loadMap(mapId) {
     return snapshot.data();
 }
 
-// 모든 몬스터 로딩
-export async function loadAllMonsters() {
-    const col = collection(db, "monsters");
-    const snapshot = await getDocs(col);
-    const monsters = [];
-    snapshot.forEach(doc => monsters.push(doc.data()));
-    return monsters;
-}
-
-// 특정 지역(overworld/dungeon) 몬스터 로딩
+// 특정 지역 몬스터 로딩 (스폰 정보 포함)
 export async function loadMonstersByArea(areaId) {
     const col = collection(db, "monsters");
     const q = query(col, where("area", "==", areaId));
@@ -48,7 +39,7 @@ export async function loadMonstersByArea(areaId) {
     return monsters;
 }
 
-// 특정 지역 NPC 로딩
+// 특정 지역 NPC 로딩 (퀘스트/스토리 포함)
 export async function loadNPCs(areaId) {
     const col = collection(db, "npcs");
     const q = query(col, where("area", "==", areaId));
@@ -56,4 +47,27 @@ export async function loadNPCs(areaId) {
     const npcs = [];
     snapshot.forEach(doc => npcs.push(doc.data()));
     return npcs;
+}
+
+// 특정 지역 퀘스트 로딩
+export async function loadQuests(areaId) {
+    const col = collection(db, "quests");
+    const q = query(col, where("area", "==", areaId));
+    const snapshot = await getDocs(q);
+    const quests = [];
+    snapshot.forEach(doc => {
+        quests.push({
+            id: doc.id,
+            ...doc.data()
+        });
+    });
+    return quests;
+}
+
+// 플레이어 장비/인벤토리 로딩 (선택)
+export async function loadPlayerData(playerId) {
+    const ref = doc(db, "players", playerId);
+    const snapshot = await getDoc(ref);
+    if (!snapshot.exists()) return null;
+    return snapshot.data();
 }

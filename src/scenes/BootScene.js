@@ -1,7 +1,9 @@
 import {
     loadMap,
     loadMonstersByArea,
-    loadNPCs
+    loadNPCs,
+    loadQuests,
+    loadPlayerData
 } from "../firebaseClient.js";
 
 export default class BootScene extends Phaser.Scene {
@@ -22,32 +24,32 @@ export default class BootScene extends Phaser.Scene {
         this.load.image("portal", "https://dummyimage.com/32x32/6633ff/ffffff&text=P");
         this.load.image("npc", "https://dummyimage.com/32x48/ff9999/000000&text=NPC");
 
-        // 오버월드 맵
+        // 오버월드/던전 맵
         this.overworldMap = await loadMap("overworld_latest");
         if (this.overworldMap?.tilesetUrl) {
             this.load.image("tileset_overworld", this.overworldMap.tilesetUrl);
         }
 
-        // 던전 맵
         this.dungeonMap = await loadMap("dungeon_latest");
         if (this.dungeonMap?.tilesetUrl) {
             this.load.image("tileset_dungeon", this.dungeonMap.tilesetUrl);
         }
 
-        // 오버월드 몬스터
+        // 몬스터 (오버월드/던전)
         this.overworldMonsters = await loadMonstersByArea("overworld");
         this.overworldMonsters.forEach((m, index) => {
             this.load.image(`overworld_monster_${index}`, m.imageUrl);
         });
 
-        // 던전 몬스터
         this.dungeonMonsters = await loadMonstersByArea("dungeon");
         this.dungeonMonsters.forEach((m, index) => {
             this.load.image(`dungeon_monster_${index}`, m.imageUrl);
         });
 
-        // 오버월드 NPC
+        // NPC + 퀘스트 + 플레이어 데이터
         this.overworldNPCs = await loadNPCs("overworld");
+        this.overworldQuests = await loadQuests("overworld");
+        this.playerData = await loadPlayerData("player_001"); // 임의 ID
     }
 
     create() {
@@ -55,8 +57,10 @@ export default class BootScene extends Phaser.Scene {
             overworldMap: this.overworldMap,
             overworldMonsters: this.overworldMonsters,
             overworldNPCs: this.overworldNPCs,
+            overworldQuests: this.overworldQuests,
             dungeonMap: this.dungeonMap,
-            dungeonMonsters: this.dungeonMonsters
+            dungeonMonsters: this.dungeonMonsters,
+            playerData: this.playerData
         });
     }
 }

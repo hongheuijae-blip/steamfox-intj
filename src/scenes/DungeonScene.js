@@ -6,13 +6,14 @@ export default class DungeonScene extends Phaser.Scene {
     init(data) {
         this.mapData = data.mapData;
         this.monsters = data.monsters || [];
+        this.playerData = data.playerData || {};
     }
 
     create() {
         this.cameras.main.setBackgroundColor("#1b1b1b");
 
         if (this.mapData) {
-            const { tileSize, layers, collision } = this.mapData;
+            const { tileSize, layers, collision, story } = this.mapData;
 
             const map = this.make.tilemap({
                 data: layers,
@@ -34,39 +35,42 @@ export default class DungeonScene extends Phaser.Scene {
                 collisionLayer.setCollisionBetween(1, 999);
                 this.collisionLayer = collisionLayer;
             }
+
+            this.storyText = this.add.text(20, 20, story || "", {
+                fontSize: "14px",
+                color: "#ccccff",
+                wordWrap: { width: 400 }
+            });
         }
 
         this.monsterGroup = this.physics.add.group();
-        this.monsters.forEach((m, index) => {
-            const monster = this.monsterGroup.create(
-                600 + index * 80,
-                300,
-                `dungeon_monster_${index}`
-            );
-            monster.setScale(2);
-            monster.setCollideWorldBounds(true);
-            monster.hp = m.hp;
-            monster.attack = m.attack;
-            monster.lastAttackTime = 0;
-            monster.dropItem = m.dropItem;
-        });
+        this.spawnWave(1);
 
         this.player = this.physics.add.sprite(400, 300, "fox_idle");
         this.player.setScale(1.5);
         this.player.setCollideWorldBounds(true);
-        this.player.hp = 100;
+        this.player.hp = this.playerData.hp ?? 100;
+        this.player.attackPower = this.playerData.attackPower ?? 20;
         this.player.isInvulnerable = false;
+        this.player.equipment = this.playerData.equipment || [];
+        this.inventory = this.playerData.inventory || [];
 
-        this.inventory = [];
         this.inventoryText = this.add.text(20, 80, "Inventory:", {
-            fontSize: "18px",
+            fontSize: "16px",
             color: "#ffff00"
         });
 
-        this.hpText = this.add.text(20, 20, `HP: ${this.player.hp}`, {
-            fontSize: "20px",
+        this.hpText = this.add.text(20, 50, `HP: ${this.player.hp}`, {
+            fontSize: "18px",
             color: "#ffffff"
         });
+
+        this.waveText = this.add.text(20, 110, "Wave: 1", {
+            fontSize: "16px",
+            color: "#ff6666"
+        });
+
+        this.updateInventoryUI();
 
         this.cursors = this.input.keyboard.createCursorKeys();
         this.attackKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
@@ -97,6 +101,30 @@ export default class DungeonScene extends Phaser.Scene {
         this.handleSkills(time);
         this.handleMonsterAI(time);
         this.handlePlayerAttack(time);
+        this.checkWaveClear();
+    }
+
+    spawnWave(waveNumber) {
+        this.currentWave = waveNumber;
+        this.monsterGroup.clear(true, true);
+
+        this.monsters.forEach((m, index) => {
+            const monster = this.monsterGroup.create(
+                600 + index * 80,
+                300,
+                `dungeon_monster_${index}`
+            );
+            monster.setScale(2);
+            monster.setCollideWorldBounds(true);
+            monster.hp = m.hp + (waveNumber - 1) * 10;
+            monster.attack = m.attack + (waveNumber - 1) * 2;
+            monster.lastAttackTime = 0;
+            monster.dropItem = m.dropItem;
+        });
+
+        if (this.waveText) {
+            this.waveText.setText(`Wave: ${waveNumber}`);
+        }
     }
 
     handlePlayerMovement() {
@@ -141,7 +169,7 @@ export default class DungeonScene extends Phaser.Scene {
                 );
 
                 if (distance < 150) {
-                    monster.hp -= 40;
+                    monster.hp -= this.player.attackPower * 2;
                     monster.setTint(0xff4444);
 
                     if (monster.hp <= 0) {
@@ -165,7 +193,7 @@ export default class DungeonScene extends Phaser.Scene {
                 );
 
                 if (distance < 70) {
-                    monster.hp -= 20;
+                    monster.hp -= this.player.attackPower;
                     monster.setTint(0xffaaaa);
 
                     if (monster.hp <= 0) {
@@ -200,7 +228,7 @@ export default class DungeonScene extends Phaser.Scene {
                 Math.sin(angle) * speed
             );
 
-            projectile.damage = 15;
+            projectile.damage = this.player.attackPower * 0.75;
 
             this.physics.add.overlap(projectile, this.monsterGroup, (proj, monster) => {
                 monster.hp -= proj.damage;
@@ -218,7 +246,7 @@ export default class DungeonScene extends Phaser.Scene {
         const player = this.player;
 
         this.monsterGroup.children.iterate(monster => {
-            if (!monster) return;
+            if (!monster || !monster.active) return;
 
             const distance = Phaser.Math.Distance.Between(
                 monster.x, monster.y,
@@ -286,12 +314,22 @@ export default class DungeonScene extends Phaser.Scene {
     pickupItem(item) {
         const data = item.itemData;
         this.inventory.push(data);
+        this.updateInventoryUI();
+        item.destroy();
+    }
 
+    updateInventoryUI() {
         this.inventoryText.setText(
             "Inventory:\n" +
-            this.inventory.map(i => `${i.name} (${i.rarity})`).join("\n")
+            (this.inventory.length
+                ? this.inventory.map(i => `${i.name} (${i.rarity})`).join("\n")
+                : "(empty)")
         );
+    }
 
-        item.destroy();
+    checkWaveClear() {
+        if (this.monsterGroup.countActive(true) === 0) {
+            this.spawnWave(this.currentWave + 1);
+        }
     }
 }
