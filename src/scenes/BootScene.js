@@ -1,3 +1,4 @@
+import { initializeFirestoreData } from "../firebaseInitData.js";
 import {
     loadMap,
     loadMonstersByArea,
@@ -13,12 +14,15 @@ export default class BootScene extends Phaser.Scene {
     }
 
     async preload() {
+        // Firestore 초기 데이터 자동 생성 (최초 1회 실행)
+        await initializeFirestoreData();
+
         const loadingText = this.add.text(400, 300, "Loading...", {
             fontSize: "24px",
             color: "#ffffff"
         }).setOrigin(0.5);
 
-        // 기본 플레이어 스프라이트 (지금은 Fox 기준)
+        // 기본 플레이어 스프라이트
         this.load.image("fox_idle", "https://dummyimage.com/64x64/ffffff/000000&text=Fox");
         this.load.spritesheet("fox_walk", "https://dummyimage.com/192x64/ffffff/000000&text=Walk", {
             frameWidth: 64,
@@ -44,14 +48,14 @@ export default class BootScene extends Phaser.Scene {
         this.load.image("npc", "https://dummyimage.com/32x48/ff9999/000000&text=NPC");
         this.load.image("boss", "https://dummyimage.com/96x96/ff00ff/000000&text=BOSS");
 
-        // BGM 슬롯 (나중에 mp3 추가)
+        // BGM 슬롯
         this.load.audio("bgm_overworld", "audio/overworld_bgm.mp3");
         this.load.audio("bgm_dungeon", "audio/dungeon_bgm.mp3");
         this.load.audio("bgm_boss", "audio/boss_bgm.mp3");
         this.load.audio("bgm_village", "audio/village_bgm.mp3");
         this.load.audio("bgm_story", "audio/story_bgm.mp3");
 
-        // 맵/데이터 로딩
+        // Firestore 데이터 로딩
         this.overworldMap = await loadMap("overworld_latest");
         if (this.overworldMap?.tilesetUrl) {
             this.load.image("tileset_overworld", this.overworldMap.tilesetUrl);
@@ -79,8 +83,7 @@ export default class BootScene extends Phaser.Scene {
     }
 
     create() {
-        // 기존에는 OverworldScene으로 바로 갔지만,
-        // 이제는 캐릭터 MBTI 검사 씬부터 시작
+        // MBTI 캐릭터 생성 씬으로 이동
         this.scene.start("CharacterTestScene", {
             overworldMap: this.overworldMap,
             overworldMonsters: this.overworldMonsters,
