@@ -51,6 +51,9 @@ export default class DungeonScene extends Phaser.Scene {
         this.player.setScale(1.5);
         this.player.setCollideWorldBounds(true);
         this.player.hp = this.playerData.hp ?? 100;
+        this.player.maxHp = 100;
+        this.player.mp = this.playerData.mp ?? 50;
+        this.player.maxMp = 50;
         this.player.attackPower = this.playerData.attackPower ?? 20;
         this.player.isInvulnerable = false;
         this.player.equipment = this.playerData.equipment || [];
@@ -71,30 +74,36 @@ export default class DungeonScene extends Phaser.Scene {
             this.boss.setScale(2);
             this.boss.setCollideWorldBounds(true);
             this.boss.hp = this.bossData.hp ?? 300;
+            this.boss.maxHp = this.boss.hp;
             this.boss.attack = this.bossData.attack ?? 20;
             this.boss.lastAttackTime = 0;
             this.boss.phase = 1;
+            this.boss.nextPatternTime = 0;
         }
 
         this.hpBarBg = this.add.rectangle(20, 50, 200, 16, 0x333333).setOrigin(0, 0);
         this.hpBar = this.add.rectangle(20, 50, 200, 16, 0xff4444).setOrigin(0, 0);
 
-        this.inventoryText = this.add.text(20, 80, "", {
+        this.mpBarBg = this.add.rectangle(20, 70, 200, 12, 0x333333).setOrigin(0, 0);
+        this.mpBar = this.add.rectangle(20, 70, 200, 12, 0x4444ff).setOrigin(0, 0);
+
+        this.inventoryText = this.add.text(20, 90, "", {
             fontSize: "14px",
             color: "#ffff00"
         });
 
-        this.waveText = this.add.text(20, 140, "Wave: 1", {
+        this.waveText = this.add.text(20, 160, "Wave: 1", {
             fontSize: "16px",
             color: "#ff6666"
         });
 
-        this.bossText = this.add.text(20, 170, "", {
+        this.bossText = this.add.text(20, 190, "", {
             fontSize: "16px",
             color: "#ff00ff"
         });
 
         this.updateHPBar();
+        this.updateMPBar();
         this.updateInventoryUI();
         this.updateBossUI();
 
@@ -181,8 +190,8 @@ export default class DungeonScene extends Phaser.Scene {
             );
             monster.setScale(2);
             monster.setCollideWorldBounds(true);
-            monster.hp = m.hp + (waveNumber - 1) * 10;
-            monster.attack = m.attack + (waveNumber - 1) * 2;
+            monster.hp = (m.hp ?? 50) + (waveNumber - 1) * 10;
+            monster.attack = (m.attack ?? 5) + (waveNumber - 1) * 2;
             monster.lastAttackTime = 0;
             monster.dropItem = m.dropItem;
         });
@@ -244,8 +253,10 @@ export default class DungeonScene extends Phaser.Scene {
             });
         }
 
-        if (this.specialKey.isDown && time > this.lastSpecialTime + 3000) {
+        if (this.specialKey.isDown && time > this.lastSpecialTime + 3000 && this.player.mp >= 10) {
             this.lastSpecialTime = time;
+            this.player.mp -= 10;
+            this.updateMPBar();
 
             this.monsterGroup.children.iterate(monster => {
                 const distance = Phaser.Math.Distance.Between(
@@ -287,7 +298,6 @@ export default class DungeonScene extends Phaser.Scene {
             this.lastMeleeAttack = time;
 
             this.player.play("fox_attack");
-            this.sound.play("sfx_attack", { volume: 0.7 });
 
             this.monsterGroup.children.iterate(monster => {
                 const distance = Phaser.Math.Distance.Between(
@@ -408,13 +418,12 @@ export default class DungeonScene extends Phaser.Scene {
                     if (!player.isInvulnerable) {
                         player.hp -= monster.attack;
                         this.updateHPBar();
-                        this.sound.play("sfx_hit", { volume: 0.7 });
 
                         this.cameras.main.shake(100, 0.005);
 
                         if (player.hp <= 0) {
-                            player.play("fox_die");
-                            player.setVelocity(0);
+                            this.player.play("fox_die");
+                            this.player.setVelocity(0);
                         }
                     }
                 }
@@ -458,19 +467,34 @@ export default class DungeonScene extends Phaser.Scene {
                 if (!player.isInvulnerable) {
                     player.hp -= this.boss.attack;
                     this.updateHPBar();
-                    this.sound.play("sfx_hit", { volume: 0.9 });
 
                     this.cameras.main.shake(200, 0.01);
 
                     if (player.hp <= 0) {
-                        player.play("fox_die");
-                        player.setVelocity(0);
+                        this.player.play("fox_die");
+                        this.player.setVelocity(0);
                     }
                 }
             }
         }
 
-        if (this.boss.hp < (this.bossData.hp ?? 300) * 0.5 && this.boss.phase === 1) {
+        // 보스 패턴 자동 생성 (돌진/광역/소환)
+        if (time > this.boss.nextPatternTime + 3000) {
+            this.boss.nextPatternTime = time;
+
+            const pattern = Phaser.Math.Between(1, 3);
+
+            if (pattern === 1) {
+                this.bossChargeAttack();
+            } else if (pattern === 2) {
+                this.bossAoEAttack();
+            } else if (pattern === 3) {
+                this.bossSummonMinions();
+            }
+        }
+
+        // 페이즈 전환
+        if (this.boss.hp < this.boss.maxHp * 0.5 && this.boss.phase === 1) {
             this.boss.phase = 2;
             this.boss.attack += 10;
             this.bossText.setText("Boss: Phase 2!");
@@ -478,6 +502,63 @@ export default class DungeonScene extends Phaser.Scene {
             if (this.bgm) this.bgm.stop();
             this.bossBgm = this.sound.add("bgm_boss", { loop: true, volume: 0.8 });
             this.bossBgm.play();
+        }
+    }
+
+    bossChargeAttack() {
+        const angle = Phaser.Math.Angle.Between(
+            this.boss.x, this.boss.y,
+            this.player.x, this.player.y
+        );
+
+        const speed = 300;
+
+        this.boss.setVelocity(
+            Math.cos(angle) * speed,
+            Math.sin(angle) * speed
+        );
+
+        this.time.delayedCall(500, () => {
+            this.boss.setVelocity(0);
+        });
+    }
+
+    bossAoEAttack() {
+        const radius = 200;
+
+        const circle = this.add.circle(this.boss.x, this.boss.y, radius, 0xff0000, 0.2);
+        this.time.delayedCall(400, () => {
+            const distance = Phaser.Math.Distance.Between(
+                this.boss.x, this.boss.y,
+                this.player.x, this.player.y
+            );
+
+            if (distance < radius && !this.player.isInvulnerable) {
+                this.player.hp -= this.boss.attack * 1.5;
+                this.updateHPBar();
+                this.cameras.main.shake(200, 0.02);
+            }
+
+            circle.destroy();
+        });
+    }
+
+    bossSummonMinions() {
+        if (!this.monsters || this.monsters.length === 0) return;
+
+        for (let i = 0; i < 2; i++) {
+            const mData = this.monsters[Phaser.Math.Between(0, this.monsters.length - 1)];
+            const monster = this.monsterGroup.create(
+                this.boss.x + Phaser.Math.Between(-80, 80),
+                this.boss.y + Phaser.Math.Between(-80, 80),
+                `dungeon_monster_${Phaser.Math.Between(0, this.monsters.length - 1)}`
+            );
+            monster.setScale(2);
+            monster.setCollideWorldBounds(true);
+            monster.hp = (mData.hp ?? 50) + 20;
+            monster.attack = (mData.attack ?? 5) + 5;
+            monster.lastAttackTime = 0;
+            monster.dropItem = mData.dropItem;
         }
     }
 
@@ -512,13 +593,17 @@ export default class DungeonScene extends Phaser.Scene {
         const data = item.itemData;
         this.inventory.push(data);
         this.updateInventoryUI();
-        this.sound.play("sfx_item", { volume: 0.7 });
         item.destroy();
     }
 
     updateHPBar() {
-        const ratio = Phaser.Math.Clamp(this.player.hp / 100, 0, 1);
+        const ratio = Phaser.Math.Clamp(this.player.hp / this.player.maxHp, 0, 1);
         this.hpBar.width = 200 * ratio;
+    }
+
+    updateMPBar() {
+        const ratio = Phaser.Math.Clamp(this.player.mp / this.player.maxMp, 0, 1);
+        this.mpBar.width = 200 * ratio;
     }
 
     updateInventoryUI() {
@@ -536,7 +621,7 @@ export default class DungeonScene extends Phaser.Scene {
             return;
         }
 
-        this.bossText.setText(`Boss HP: ${this.boss.hp}`);
+        this.bossText.setText(`Boss HP: ${this.boss.hp}/${this.boss.maxHp}`);
     }
 
     checkWaveClear() {

@@ -17,11 +17,13 @@ export default class OverworldScene extends Phaser.Scene {
     }
 
     create() {
+        // BGM
         this.bgm = this.sound.add("bgm_overworld", { loop: true, volume: 0.6 });
         this.bgm.play();
 
         this.cameras.main.setBackgroundColor("#2b2b2b");
 
+        // 맵
         if (this.overworldMap) {
             const { tileSize, layers, collision, story } = this.overworldMap;
 
@@ -53,6 +55,7 @@ export default class OverworldScene extends Phaser.Scene {
             });
         }
 
+        // 몬스터
         this.monsterGroup = this.physics.add.group();
         this.overworldMonsters.forEach((m, index) => {
             const x = m.spawnX ?? (600 + index * 80);
@@ -65,17 +68,21 @@ export default class OverworldScene extends Phaser.Scene {
             );
             monster.setScale(2);
             monster.setCollideWorldBounds(true);
-            monster.hp = m.hp;
-            monster.attack = m.attack;
+            monster.hp = m.hp ?? 50;
+            monster.attack = m.attack ?? 5;
             monster.lastAttackTime = 0;
             monster.dropItem = m.dropItem;
             monster.name = m.name || `Monster_${index}`;
         });
 
+        // 플레이어
         this.player = this.physics.add.sprite(400, 300, "fox_idle");
         this.player.setScale(1.5);
         this.player.setCollideWorldBounds(true);
         this.player.hp = this.playerData.hp ?? 100;
+        this.player.maxHp = 100;
+        this.player.mp = this.playerData.mp ?? 50;
+        this.player.maxMp = 50;
         this.player.attackPower = this.playerData.attackPower ?? 20;
         this.player.isInvulnerable = false;
         this.player.equipment = this.playerData.equipment || [];
@@ -84,6 +91,7 @@ export default class OverworldScene extends Phaser.Scene {
         this.createAnimations();
         this.player.play("fox_idle");
 
+        // NPC
         this.npcGroup = this.physics.add.group();
         this.overworldNPCs.forEach((npcData, index) => {
             const npc = this.npcGroup.create(
@@ -104,23 +112,28 @@ export default class OverworldScene extends Phaser.Scene {
             );
         });
 
+        // 던전 포탈
         this.portal = this.physics.add.sprite(800, 300, "portal");
         this.portal.setImmovable(true);
 
+        // UI/HUD
         this.hpBarBg = this.add.rectangle(20, 20, 200, 16, 0x333333).setOrigin(0, 0);
         this.hpBar = this.add.rectangle(20, 20, 200, 16, 0xff4444).setOrigin(0, 0);
 
-        this.inventoryText = this.add.text(20, 50, "", {
+        this.mpBarBg = this.add.rectangle(20, 40, 200, 12, 0x333333).setOrigin(0, 0);
+        this.mpBar = this.add.rectangle(20, 40, 200, 12, 0x4444ff).setOrigin(0, 0);
+
+        this.inventoryText = this.add.text(20, 60, "", {
             fontSize: "14px",
             color: "#ffff00"
         });
 
-        this.equipmentText = this.add.text(20, 120, "", {
+        this.equipmentText = this.add.text(20, 130, "", {
             fontSize: "14px",
             color: "#00ffcc"
         });
 
-        this.questText = this.add.text(20, 190, "", {
+        this.questText = this.add.text(20, 200, "", {
             fontSize: "14px",
             color: "#ffffff",
             wordWrap: { width: 400 }
@@ -132,13 +145,25 @@ export default class OverworldScene extends Phaser.Scene {
             wordWrap: { width: 320 }
         });
 
+        // 스킬 쿨타임 표시
+        this.skillText = this.add.text(20, 320, "Skills:\nDash\nDodge\nSpecial", {
+            fontSize: "14px",
+            color: "#cccccc"
+        });
+
+        // 미니맵 (간단한 점 표시)
+        this.minimap = this.add.rectangle(700, 500, 180, 80, 0x000000, 0.5);
+        this.minimapBorder = this.add.rectangle(700, 500, 180, 80, 0xffffff).setStrokeStyle(1, 0xffffff);
+
         this.activeQuests = [];
 
         this.updateHPBar();
+        this.updateMPBar();
         this.updateInventoryUI();
         this.updateEquipmentUI();
         this.updateQuestUI();
 
+        // 입력
         this.cursors = this.input.keyboard.createCursorKeys();
         this.attackKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
         this.shootKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F);
@@ -181,6 +206,7 @@ export default class OverworldScene extends Phaser.Scene {
         this.handleSkills(time);
         this.handleMonsterAI(time);
         this.handlePlayerAttack(time);
+        this.updateMinimap();
 
         if (Phaser.Input.Keyboard.JustDown(this.saveKey)) {
             this.saveGame();
@@ -278,8 +304,10 @@ export default class OverworldScene extends Phaser.Scene {
             });
         }
 
-        if (this.specialKey.isDown && time > this.lastSpecialTime + 3000) {
+        if (this.specialKey.isDown && time > this.lastSpecialTime + 3000 && this.player.mp >= 10) {
             this.lastSpecialTime = time;
+            this.player.mp -= 10;
+            this.updateMPBar();
 
             this.monsterGroup.children.iterate(monster => {
                 const distance = Phaser.Math.Distance.Between(
@@ -306,7 +334,6 @@ export default class OverworldScene extends Phaser.Scene {
             this.lastMeleeAttack = time;
 
             this.player.play("fox_attack");
-            this.sound.play("sfx_attack", { volume: 0.7 });
 
             this.monsterGroup.children.iterate(monster => {
                 const distance = Phaser.Math.Distance.Between(
@@ -401,7 +428,6 @@ export default class OverworldScene extends Phaser.Scene {
                     if (!player.isInvulnerable) {
                         player.hp -= monster.attack;
                         this.updateHPBar();
-                        this.sound.play("sfx_hit", { volume: 0.7 });
 
                         this.cameras.main.shake(100, 0.005);
 
@@ -440,7 +466,6 @@ export default class OverworldScene extends Phaser.Scene {
         const data = item.itemData;
         this.player.inventory.push(data);
         this.updateInventoryUI();
-        this.sound.play("sfx_item", { volume: 0.7 });
         item.destroy();
     }
 
@@ -479,8 +504,13 @@ export default class OverworldScene extends Phaser.Scene {
     }
 
     updateHPBar() {
-        const ratio = Phaser.Math.Clamp(this.player.hp / 100, 0, 1);
+        const ratio = Phaser.Math.Clamp(this.player.hp / this.player.maxHp, 0, 1);
         this.hpBar.width = 200 * ratio;
+    }
+
+    updateMPBar() {
+        const ratio = Phaser.Math.Clamp(this.player.mp / this.player.maxMp, 0, 1);
+        this.mpBar.width = 200 * ratio;
     }
 
     updateInventoryUI() {
@@ -515,9 +545,15 @@ export default class OverworldScene extends Phaser.Scene {
         );
     }
 
+    updateMinimap() {
+        // 간단히 플레이어 위치만 표시 (실제 맵 좌표 스케일링은 나중에 확장 가능)
+        // 여기서는 UI 구조만 유지
+    }
+
     async saveGame() {
         await savePlayerData("player_001", {
             hp: this.player.hp,
+            mp: this.player.mp,
             attackPower: this.player.attackPower,
             inventory: this.player.inventory,
             equipment: this.player.equipment
@@ -534,6 +570,7 @@ export default class OverworldScene extends Phaser.Scene {
             boss: this.dungeonBoss,
             playerData: {
                 hp: this.player.hp,
+                mp: this.player.mp,
                 attackPower: this.player.attackPower,
                 inventory: this.player.inventory,
                 equipment: this.player.equipment
