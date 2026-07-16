@@ -6,7 +6,8 @@ import {
     collection,
     getDocs,
     query,
-    where
+    where,
+    setDoc
 } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -29,7 +30,7 @@ export async function loadMap(mapId) {
     return snapshot.data();
 }
 
-// 특정 지역 몬스터 로딩 (스폰 정보 포함)
+// 특정 지역 몬스터 로딩
 export async function loadMonstersByArea(areaId) {
     const col = collection(db, "monsters");
     const q = query(col, where("area", "==", areaId));
@@ -39,7 +40,7 @@ export async function loadMonstersByArea(areaId) {
     return monsters;
 }
 
-// 특정 지역 NPC 로딩 (퀘스트/스토리 포함)
+// 특정 지역 NPC 로딩
 export async function loadNPCs(areaId) {
     const col = collection(db, "npcs");
     const q = query(col, where("area", "==", areaId));
@@ -64,10 +65,24 @@ export async function loadQuests(areaId) {
     return quests;
 }
 
-// 플레이어 장비/인벤토리 로딩 (선택)
+// 보스 데이터 로딩
+export async function loadBoss(areaId) {
+    const ref = doc(db, "bosses", areaId);
+    const snapshot = await getDoc(ref);
+    if (!snapshot.exists()) return null;
+    return snapshot.data();
+}
+
+// 플레이어 데이터 로딩
 export async function loadPlayerData(playerId) {
     const ref = doc(db, "players", playerId);
     const snapshot = await getDoc(ref);
     if (!snapshot.exists()) return null;
     return snapshot.data();
+}
+
+// 플레이어 데이터 저장 (세이브)
+export async function savePlayerData(playerId, data) {
+    const ref = doc(db, "players", playerId);
+    await setDoc(ref, data, { merge: true });
 }

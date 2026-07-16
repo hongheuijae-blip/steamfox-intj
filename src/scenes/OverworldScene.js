@@ -1,3 +1,5 @@
+import { savePlayerData } from "../firebaseClient.js";
+
 export default class OverworldScene extends Phaser.Scene {
     constructor() {
         super("OverworldScene");
@@ -10,15 +12,20 @@ export default class OverworldScene extends Phaser.Scene {
         this.overworldQuests = data.overworldQuests || [];
         this.dungeonMap = data.dungeonMap;
         this.dungeonMonsters = data.dungeonMonsters || [];
+        this.dungeonBoss = data.dungeonBoss || null;
         this.playerData = data.playerData || {};
     }
 
     create() {
+        // BGM
+        this.bgm = this.sound.add("bgm_overworld", { loop: true, volume: 0.5 });
+        this.bgm.play();
+
+        // 맵
         this.cameras.main.setBackgroundColor("#2b2b2b");
 
-        // 맵 + 충돌
         if (this.overworldMap) {
-            const { tileSize, layers, collision } = this.overworldMap;
+            const { tileSize, layers, collision, story } = this.overworldMap;
 
             const map = this.make.tilemap({
                 data: layers,
@@ -40,9 +47,15 @@ export default class OverworldScene extends Phaser.Scene {
                 collisionLayer.setCollisionBetween(1, 999);
                 this.collisionLayer = collisionLayer;
             }
+
+            this.storyText = this.add.text(450, 20, story || "", {
+                fontSize: "14px",
+                color: "#ccccff",
+                wordWrap: { width: 320 }
+            });
         }
 
-        // 몬스터 스폰 (기본 위치 + 스폰 정보 활용 가능)
+        // 몬스터
         this.monsterGroup = this.physics.add.group();
         this.overworldMonsters.forEach((m, index) => {
             const x = m.spawnX ?? (600 + index * 80);
@@ -59,11 +72,10 @@ export default class OverworldScene extends Phaser.Scene {
             monster.attack = m.attack;
             monster.lastAttackTime = 0;
             monster.dropItem = m.dropItem;
-            monster.spawnArea = m.spawnArea || "overworld";
-            monster.respawnTime = m.respawnTime || 0;
+            monster.name = m.name || `Monster_${index}`;
         });
 
-        // 플레이어 + 장비/스탯
+        // 플레이어
         this.player = this.physics.add.sprite(400, 300, "fox_idle");
         this.player.setScale(1.5);
         this.player.setCollideWorldBounds(true);
@@ -71,6 +83,11 @@ export default class OverworldScene extends Phaser.Scene {
         this.player.attackPower = this.playerData.attackPower ?? 20;
         this.player.isInvulnerable = false;
         this.player.equipment = this.playerData.equipment || [];
+        this.player.inventory = this.playerData.inventory || [];
+
+        // 애니메이션
+        this.createAnimations();
+        this.player.play("fox_idle");
 
         // NPC
         this.npcGroup = this.physics.add.group();
@@ -93,37 +110,28 @@ export default class OverworldScene extends Phaser.Scene {
             );
         });
 
-        // 포탈 (던전 입구)
+        // 포탈
         this.portal = this.physics.add.sprite(800, 300, "portal");
         this.portal.setImmovable(true);
 
-        // 인벤토리/장비/퀘스트 UI
-        this.inventory = this.playerData.inventory || [];
-        this.inventoryText = this.add.text(20, 80, "Inventory:", {
-            fontSize: "16px",
+        // UI / HUD
+        this.hpBarBg = this.add.rectangle(20, 20, 200, 16, 0x333333).setOrigin(0, 0);
+        this.hpBar = this.add.rectangle(20, 20, 200, 16, 0xff4444).setOrigin(0, 0);
+
+        this.inventoryText = this.add.text(20, 50, "", {
+            fontSize: "14px",
             color: "#ffff00"
         });
 
-        this.equipmentText = this.add.text(20, 160, "Equipment:", {
-            fontSize: "16px",
+        this.equipmentText = this.add.text(20, 120, "", {
+            fontSize: "14px",
             color: "#00ffcc"
         });
 
-        this.questText = this.add.text(20, 240, "Quests:", {
-            fontSize: "16px",
+        this.questText = this.add.text(20, 190, "", {
+            fontSize: "14px",
             color: "#ffffff",
             wordWrap: { width: 400 }
-        });
-
-        this.hpText = this.add.text(20, 20, `HP: ${this.player.hp}`, {
-            fontSize: "20px",
-            color: "#ffffff"
-        });
-
-        this.storyText = this.add.text(450, 20, this.overworldMap?.story || "", {
-            fontSize: "14px",
-            color: "#ccccff",
-            wordWrap: { width: 320 }
         });
 
         this.dialogText = this.add.text(450, 140, "", {
@@ -132,6 +140,9 @@ export default class OverworldScene extends Phaser.Scene {
             wordWrap: { width: 320 }
         });
 
+        this.activeQuests = [];
+
+        this.updateHPBar();
         this.updateInventoryUI();
         this.updateEquipmentUI();
         this.updateQuestUI();
@@ -144,6 +155,7 @@ export default class OverworldScene extends Phaser.Scene {
         this.dodgeKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ALT);
         this.specialKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
         this.interactKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+        this.saveKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S);
 
         this.moveSpeed = 200;
         this.lastMeleeAttack = 0;
@@ -154,7 +166,7 @@ export default class OverworldScene extends Phaser.Scene {
 
         this.projectiles = this.physics.add.group();
 
-        // 충돌/오버랩
+        // 충돌
         if (this.collisionLayer) {
             this.physics.add.collider(this.player, this.collisionLayer);
             this.physics.add.collider(this.monsterGroup, this.collisionLayer);
@@ -179,22 +191,83 @@ export default class OverworldScene extends Phaser.Scene {
         this.handleSkills(time);
         this.handleMonsterAI(time);
         this.handlePlayerAttack(time);
-        this.handleMonsterRespawn(time);
+
+        if (Phaser.Input.Keyboard.JustDown(this.saveKey)) {
+            this.saveGame();
+        }
+    }
+
+    createAnimations() {
+        this.anims.create({
+            key: "fox_idle",
+            frames: [{ key: "fox_idle" }],
+            frameRate: 1,
+            repeat: -1
+        });
+
+        this.anims.create({
+            key: "fox_walk",
+            frames: this.anims.generateFrameNumbers("fox_walk", { start: 0, end: 2 }),
+            frameRate: 8,
+            repeat: -1
+        });
+
+        this.anims.create({
+            key: "fox_attack",
+            frames: this.anims.generateFrameNumbers("fox_attack", { start: 0, end: 2 }),
+            frameRate: 10,
+            repeat: 0
+        });
+
+        this.anims.create({
+            key: "fox_hit",
+            frames: this.anims.generateFrameNumbers("fox_hit", { start: 0, end: 2 }),
+            frameRate: 10,
+            repeat: 0
+        });
+
+        this.anims.create({
+            key: "fox_die",
+            frames: this.anims.generateFrameNumbers("fox_die", { start: 0, end: 2 }),
+            frameRate: 6,
+            repeat: 0
+        });
     }
 
     handlePlayerMovement() {
         const speed = this.moveSpeed;
         this.player.setVelocity(0);
 
-        if (this.cursors.left.isDown) this.player.setVelocityX(-speed);
-        else if (this.cursors.right.isDown) this.player.setVelocityX(speed);
+        let moving = false;
 
-        if (this.cursors.up.isDown) this.player.setVelocityY(-speed);
-        else if (this.cursors.down.isDown) this.player.setVelocityY(speed);
+        if (this.cursors.left.isDown) {
+            this.player.setVelocityX(-speed);
+            moving = true;
+        } else if (this.cursors.right.isDown) {
+            this.player.setVelocityX(speed);
+            moving = true;
+        }
+
+        if (this.cursors.up.isDown) {
+            this.player.setVelocityY(-speed);
+            moving = true;
+        } else if (this.cursors.down.isDown) {
+            this.player.setVelocityY(speed);
+            moving = true;
+        }
+
+        if (moving) {
+            if (this.player.anims.currentAnim?.key !== "fox_walk") {
+                this.player.play("fox_walk");
+            }
+        } else {
+            if (this.player.anims.currentAnim?.key !== "fox_idle") {
+                this.player.play("fox_idle");
+            }
+        }
     }
 
     handleSkills(time) {
-        // 대시
         if (this.dashKey.isDown && time > this.lastDashTime + 1000) {
             this.lastDashTime = time;
             const dashSpeed = 500;
@@ -205,7 +278,6 @@ export default class OverworldScene extends Phaser.Scene {
             }
         }
 
-        // 회피 (무적)
         if (this.dodgeKey.isDown && time > this.lastDodgeTime + 1500) {
             this.lastDodgeTime = time;
             this.player.isInvulnerable = true;
@@ -216,7 +288,6 @@ export default class OverworldScene extends Phaser.Scene {
             });
         }
 
-        // 특수 공격 (AoE)
         if (this.specialKey.isDown && time > this.lastSpecialTime + 3000) {
             this.lastSpecialTime = time;
 
@@ -241,9 +312,11 @@ export default class OverworldScene extends Phaser.Scene {
     }
 
     handlePlayerAttack(time) {
-        // 근접
         if (this.attackKey.isDown && time > this.lastMeleeAttack + 500) {
             this.lastMeleeAttack = time;
+
+            this.player.play("fox_attack");
+            this.sound.play("sfx_attack", { volume: 0.7 });
 
             this.monsterGroup.children.iterate(monster => {
                 const distance = Phaser.Math.Distance.Between(
@@ -262,7 +335,6 @@ export default class OverworldScene extends Phaser.Scene {
             });
         }
 
-        // 원거리
         if (this.shootKey.isDown && time > this.lastShootAttack + 800) {
             this.lastShootAttack = time;
 
@@ -338,23 +410,19 @@ export default class OverworldScene extends Phaser.Scene {
 
                     if (!player.isInvulnerable) {
                         player.hp -= monster.attack;
-                        this.hpText.setText(`HP: ${player.hp}`);
+                        this.updateHPBar();
+                        this.sound.play("sfx_hit", { volume: 0.7 });
 
                         this.cameras.main.shake(100, 0.005);
 
                         if (player.hp <= 0) {
-                            player.setTint(0xff0000);
+                            player.play("fox_die");
                             player.setVelocity(0);
                         }
                     }
                 }
             }
         });
-    }
-
-    handleMonsterRespawn(time) {
-        // 간단한 리스폰 예시: respawnTime이 설정된 몬스터는 일정 시간 후 다시 스폰
-        // 실제 구현에서는 별도 데이터 구조로 관리하는 게 좋음
     }
 
     killMonster(monster) {
@@ -380,8 +448,9 @@ export default class OverworldScene extends Phaser.Scene {
 
     pickupItem(item) {
         const data = item.itemData;
-        this.inventory.push(data);
+        this.player.inventory.push(data);
         this.updateInventoryUI();
+        this.sound.play("sfx_item", { volume: 0.7 });
         item.destroy();
     }
 
@@ -400,7 +469,6 @@ export default class OverworldScene extends Phaser.Scene {
     }
 
     acceptQuest(quest) {
-        if (!this.activeQuests) this.activeQuests = [];
         if (!this.activeQuests.find(q => q.id === quest.id)) {
             this.activeQuests.push({ ...quest, progress: 0, completed: false });
             this.updateQuestUI();
@@ -408,8 +476,6 @@ export default class OverworldScene extends Phaser.Scene {
     }
 
     checkQuestProgress(monster) {
-        if (!this.activeQuests) return;
-
         this.activeQuests.forEach(q => {
             if (q.type === "kill" && q.targetMonster === monster.name && !q.completed) {
                 q.progress += 1;
@@ -422,20 +488,27 @@ export default class OverworldScene extends Phaser.Scene {
         this.updateQuestUI();
     }
 
+    updateHPBar() {
+        const ratio = Phaser.Math.Clamp(this.player.hp / 100, 0, 1);
+        this.hpBar.width = 200 * ratio;
+    }
+
     updateInventoryUI() {
+        const list = this.player.inventory || [];
         this.inventoryText.setText(
             "Inventory:\n" +
-            (this.inventory.length
-                ? this.inventory.map(i => `${i.name} (${i.rarity})`).join("\n")
+            (list.length
+                ? list.map(i => `${i.name} (${i.rarity})`).join("\n")
                 : "(empty)")
         );
     }
 
     updateEquipmentUI() {
+        const list = this.player.equipment || [];
         this.equipmentText.setText(
             "Equipment:\n" +
-            (this.player.equipment.length
-                ? this.player.equipment.map(e => `${e.slot}: ${e.name}`).join("\n")
+            (list.length
+                ? list.map(e => `${e.slot}: ${e.name}`).join("\n")
                 : "(none)")
         );
     }
@@ -452,14 +525,27 @@ export default class OverworldScene extends Phaser.Scene {
         );
     }
 
+    async saveGame() {
+        await savePlayerData("player_001", {
+            hp: this.player.hp,
+            attackPower: this.player.attackPower,
+            inventory: this.player.inventory,
+            equipment: this.player.equipment
+        });
+
+        this.dialogText.setText("게임이 저장되었습니다.");
+    }
+
     enterDungeon() {
+        this.bgm.stop();
         this.scene.start("DungeonScene", {
             mapData: this.dungeonMap,
             monsters: this.dungeonMonsters,
+            boss: this.dungeonBoss,
             playerData: {
                 hp: this.player.hp,
                 attackPower: this.player.attackPower,
-                inventory: this.inventory,
+                inventory: this.player.inventory,
                 equipment: this.player.equipment
             }
         });
