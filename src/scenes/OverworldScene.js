@@ -3,13 +3,33 @@ export default class OverworldScene extends Phaser.Scene {
         super("OverworldScene");
     }
 
+    init(data) {
+        // BootScene에서 전달된 Firestore 몬스터 데이터
+        this.monsterData = data.monsterData || null;
+    }
+
     create() {
         // 기본 배경 색
         this.cameras.main.setBackgroundColor("#2b2b2b");
 
-        // 캐릭터 생성 (BootScene에서 로딩한 이미지 사용)
+        // 🔥 Firestore에서 로딩된 몬스터 스폰
+        if (this.monsterData) {
+            this.monster = this.physics.add.sprite(
+                500, 300, "monsterImage"
+            );
+            this.monster.setScale(2);
+
+            // 몬스터 정보 표시
+            this.add.text(
+                20, 20,
+                `${this.monsterData.name}\nHP: ${this.monsterData.hp}\nATK: ${this.monsterData.attack}`,
+                { fontSize: "20px", color: "#ffffff" }
+            );
+        }
+
+        // 플레이어 생성
         this.player = this.physics.add.sprite(400, 300, "fox_idle");
-        this.player.setScale(1.5); // 테스트용 확대
+        this.player.setScale(1.5);
         this.player.setCollideWorldBounds(true);
 
         // 방향키 입력
