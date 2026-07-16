@@ -1,0 +1,41 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build output
+dist/
+build/
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env.development
+
+# Firebase service account
+firebase-service-account.json
+
+# Logs
+logs/
+*.log
+*.log.*
+debug.log
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Phaser assets (generated)
+src/assets/generated/
+public/assets/generated/
+
+# Temporary files
+tmp/
+temp/
+
+# Codespaces
+.gitpod.yml
