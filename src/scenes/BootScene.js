@@ -1,4 +1,4 @@
-import { loadMonster } from "../firebaseClient.js";
+import { loadAllMonsters } from "../firebaseClient.js";
 
 export default class BootScene extends Phaser.Scene {
     constructor() {
@@ -6,36 +6,27 @@ export default class BootScene extends Phaser.Scene {
     }
 
     async preload() {
-        // 기본 로딩 텍스트
         const loadingText = this.add.text(400, 300, "Loading...", {
             fontSize: "24px",
             color: "#ffffff"
         }).setOrigin(0.5);
 
-        // 🔧 기본 테스트용 이미지 (플레이어)
+        // 플레이어 기본 이미지
         this.load.image("fox_idle", "https://dummyimage.com/64x64/ffffff/000000&text=Fox");
 
-        // 🔥 Firestore에서 자동 생성된 몬스터 데이터 로드
-        const monsterId = "monster_latest"; // 나중에 generate.js에서 최신 ID 저장 가능
-        const monsterData = await loadMonster(monsterId);
+        // 🔥 Firestore에서 모든 몬스터 로딩
+        const monsters = await loadAllMonsters();
+        this.monsters = monsters;
 
-        if (!monsterData) {
-            console.warn("⚠️ Firestore 몬스터 데이터 없음");
-        } else {
-            this.monsterData = monsterData;
-
-            // 🔥 Drive 이미지 로딩
-            this.load.image(
-                "monsterImage",
-                monsterData.imageUrl
-            );
-        }
+        // 🔥 Drive 이미지 여러 개 자동 로딩
+        monsters.forEach((m, index) => {
+            this.load.image(`monster_${index}`, m.imageUrl);
+        });
     }
 
     create() {
-        // OverworldScene으로 데이터 전달
         this.scene.start("OverworldScene", {
-            monsterData: this.monsterData
+            monsters: this.monsters
         });
     }
 }

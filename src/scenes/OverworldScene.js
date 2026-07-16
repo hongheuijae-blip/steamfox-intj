@@ -4,62 +4,110 @@ export default class OverworldScene extends Phaser.Scene {
     }
 
     init(data) {
-        // BootScene에서 전달된 Firestore 몬스터 데이터
-        this.monsterData = data.monsterData || null;
+        this.monsters = data.monsters || [];
     }
 
     create() {
-        // 기본 배경 색
         this.cameras.main.setBackgroundColor("#2b2b2b");
 
-        // 🔥 Firestore에서 로딩된 몬스터 스폰
-        if (this.monsterData) {
-            this.monster = this.physics.add.sprite(
-                500, 300, "monsterImage"
-            );
-            this.monster.setScale(2);
+        // 🔥 여러 몬스터 자동 스폰
+        this.monsterGroup = this.physics.add.group();
 
-            // 몬스터 정보 표시
-            this.add.text(
-                20, 20,
-                `${this.monsterData.name}\nHP: ${this.monsterData.hp}\nATK: ${this.monsterData.attack}`,
-                { fontSize: "20px", color: "#ffffff" }
+        this.monsters.forEach((m, index) => {
+            const monster = this.monsterGroup.create(
+                600 + index * 80,
+                300,
+                `monster_${index}`
             );
-        }
+
+            monster.setScale(2);
+            monster.setCollideWorldBounds(true);
+
+            monster.hp = m.hp;
+            monster.attack = m.attack;
+            monster.lastAttackTime = 0;
+        });
 
         // 플레이어 생성
         this.player = this.physics.add.sprite(400, 300, "fox_idle");
         this.player.setScale(1.5);
         this.player.setCollideWorldBounds(true);
+        this.player.hp = 100;
 
-        // 방향키 입력
         this.cursors = this.input.keyboard.createCursorKeys();
-
-        // 이동 속도
         this.moveSpeed = 200;
 
-        // 화면 중앙 카메라
         this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+
+        this.hpText = this.add.text(20, 20, `HP: ${this.player.hp}`, {
+            fontSize: "20px",
+            color: "#ffffff"
+        });
     }
 
-    update() {
-        const speed = this.moveSpeed;
+    update(time) {
+        this.handlePlayerMovement();
+        this.handleMonsterAI(time);
+    }
 
-        // 매 프레임마다 속도 초기화
+    handlePlayerMovement() {
+        const speed = this.moveSpeed;
         this.player.setVelocity(0);
 
-        // 좌우 이동
-        if (this.cursors.left.isDown) {
-            this.player.setVelocityX(-speed);
-        } else if (this.cursors.right.isDown) {
-            this.player.setVelocityX(speed);
-        }
+        if (this.cursors.left.isDown) this.player.setVelocityX(-speed);
+        else if (this.cursors.right.isDown) this.player.setVelocityX(speed);
 
-        // 상하 이동
-        if (this.cursors.up.isDown) {
-            this.player.setVelocityY(-speed);
-        } else if (this.cursors.down.isDown) {
-            this.player.setVelocityY(speed);
-        }
+        if (this.cursors.up.isDown) this.player.setVelocityY(-speed);
+        else if (this.cursors.down.isDown) this.player.setVelocityY(speed);
+    }
+
+    handleMonsterAI(time) {
+        const player = this.player;
+
+        this.monsterGroup.children.iterate(monster => {
+            if (!monster) return;
+
+            const distance = Phaser.Math.Distance.Between(
+                monster.x, monster.y,
+                player.x, player.y
+            );
+
+            const chaseRange = 300;
+            const attackRange = 60;
+
+            // 추적
+            if (distance < chaseRange && distance > attackRange) {
+                const angle = Phaser.Math.Angle.Between(
+                    monster.x, monster.y,
+                    player.x, player.y
+                );
+
+                const speed = 100;
+
+                monster.setVelocity(
+                    Math.cos(angle) * speed,
+                    Math.sin(angle) * speed
+                );
+            } else {
+                monster.setVelocity(0);
+            }
+
+            // 공격
+            if (distance <= attackRange) {
+                if (time > monster.lastAttackTime + 1000) {
+                    monster.lastAttackTime = time;
+
+                    player.hp -= monster.attack;
+                    this.hpText.setText(`HP: ${player.hp}`);
+
+                    this.cameras.main.shake(100, 0.005);
+
+                    if (player.hp <= 0) {
+                        player.setTint(0xff0000);
+                        player.setVelocity(0);
+                    }
+                }
+            }
+        });
     }
 }
